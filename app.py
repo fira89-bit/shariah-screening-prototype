@@ -2,7 +2,7 @@ import streamlit as st
 
 st.set_page_config(page_title="Shariah Screening Prototype", layout="wide")
 
-st.title("2-Tier Quantitative Screening Prototype (Rule-Based)")
+st.title("Business Activity Benchmark")
 st.caption("Tier 1 is a PASS/FAIL gate based on Contribution vs PBT (≤ 5%). Tier 2 appears only if Tier 1 = PASS.")
 
 # -------------------------
@@ -21,19 +21,16 @@ def safe_percent(n, d):
         return None
     return (n / d) * 100
 
-def ratio_label(value, threshold):
-    if value is None:
-        return "Not computed (invalid denominator)"
-    return "Within 33% threshold" if value <= threshold else "Exceeds 33% threshold"
-
 # =========================
 # TIER 1
 # =========================
-st.subheader("Non-permissible activities contribution (Benchmark reference)")
+st.subheader("Business Activity Benchmark (Benchmark reference)")
 st.write("User enters figures based on audited financial statements.")
 
 # STEP 1: Activities (top)
-st.markdown("#### List of Non-Permissible Activities (Multi-select)")
+st.markdown("#### Shariah non-compliant business activities")
+st.write("Multiple select Shariah non-compliant business activity and enter amount.")
+
 master_list = [
     "Conventional banking & lending",
     "Conventional insurance",
@@ -84,8 +81,9 @@ with c2:
 
 st.divider()
 
-# STEP 3: Tier 1 output (PBT only)
-st.markdown("### Tier 1 Output (PBT-based only)")
+# STEP 3: Tier 1 computation (PBT only)
+st.markdown("### Computation Business Activity Benchmark")
+
 o1, o2, o3 = st.columns(3)
 with o1:
     st.metric("Total Non-permissible (RM)", f"{total_non_perm:,.2f}")
@@ -115,7 +113,8 @@ st.caption("Note: Group Total Income is retained as Tier 1 reference input, but 
 # =========================
 if tier1_status == "PASS":
     st.divider()
-    st.subheader("Tier 2 — Measuring riba-based elements through financial ratios (<33%)")
+    st.subheader("Financial Ratio Benchmark")
+    st.write("Measure riba or riba based elements in a company's statements of financial position.")
 
     colA, colB = st.columns(2, gap="large")
 
@@ -137,41 +136,33 @@ if tier1_status == "PASS":
     debt_ratio = safe_percent(interest_bearing_debt, total_assets)
 
     with colB:
-        st.markdown("### Tier 2 Output")
-        st.metric("Tier 2 Threshold", f"{tier2_threshold:.1f}%")
+        st.markdown("### Computation Financial Ratio Benchmark")
+        st.metric("Threshold", f"{tier2_threshold:.1f}%")
 
-        # Ratio 1 + label
+        # Cash Ratio
         if cash_ratio is None:
-            st.metric("Cash / Total Assets (%)", "—")
+            st.metric("Cash Ratio (%)", "—")
             st.warning("Cash ratio cannot be computed (Total Assets = 0).")
-            cash_lbl = "Not computed"
         else:
-            st.metric("Cash / Total Assets (%)", f"{cash_ratio:.3f}%")
-            cash_lbl = ratio_label(cash_ratio, tier2_threshold)
-            st.write("**Label (Cash):**", cash_lbl)
+            st.metric("Cash Ratio (%)", f"{cash_ratio:.3f}%")
 
-        st.write("")  # spacing
+        st.write("")
 
-        # Ratio 2 + label
+        # Debt Ratio
         if debt_ratio is None:
-            st.metric("Debt / Total Assets (%)", "—")
+            st.metric("Debt Ratio (%)", "—")
             st.warning("Debt ratio cannot be computed (Total Assets = 0).")
-            debt_lbl = "Not computed"
         else:
-            st.metric("Debt / Total Assets (%)", f"{debt_ratio:.3f}%")
-            debt_lbl = ratio_label(debt_ratio, tier2_threshold)
-            st.write("**Label (Debt):**", debt_lbl)
+            st.metric("Debt Ratio (%)", f"{debt_ratio:.3f}%")
 
         st.divider()
 
-        # Final Tier 2 PASS/FAIL (BOTH must be within threshold)
+        # Overall Tier 2 PASS/FAIL (both must be <= threshold)
         if cash_ratio is None or debt_ratio is None:
             st.warning("Tier 2 Status: NOT READY — Please ensure Total Assets > 0 and complete inputs.")
         else:
             tier2_status = "PASS" if (cash_ratio <= tier2_threshold and debt_ratio <= tier2_threshold) else "FAIL"
             if tier2_status == "PASS":
-                st.success("Tier 2 Status: PASS — Both ratios are within 33% threshold.")
+                st.success("Tier 2 Status: PASS — Both ratios are within the threshold.")
             else:
-                st.error("Tier 2 Status: FAIL — One or both ratios exceed the 33% threshold.")
-
-        st.caption("Tier 2 shows per-ratio threshold labels first, then determines overall PASS/FAIL (rule-based).")
+                st.error("Tier 2 Status: FAIL — One or both ratios exceed the threshold.")
