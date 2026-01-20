@@ -20,28 +20,31 @@ tier2_threshold = st.sidebar.number_input(
     value=33.0, step=0.1
 )
 
-# -------------------------
+def safe_percent(n, d):
+    if d is None or d == 0:
+        return None
+    return (n / d) * 100
+
+# =========================
 # TIER 1
-# -------------------------
-st.subheader("Tier 1 — Non-permissible activities contribution (Benchmark reference)")
+# =========================
+st.subheader("Non-permissible activities contribution (Benchmark reference)")
 st.write("User enters figures based on audited financial statements.")
 
+# Keep both inputs (Income + PBT)
 t1_a, t1_b = st.columns(2, gap="large")
-
 with t1_a:
-    # KEEP Group Total Income (do not remove)
     group_total_income = st.number_input(
         "Group Total Income (RM)",
         min_value=0.0, value=0.0, step=1000.0, format="%.2f"
     )
-
 with t1_b:
     group_pbt = st.number_input(
         "Group Profit Before Tax (PBT) (RM)",
         value=0.0, step=1000.0, format="%.2f"
     )
 
-st.markdown("### 1st Tier: List of Non-Permissible Activities (Multi-select)")
+st.markdown("#### List of Non-Permissible Activities (Multi-select)")
 master_list = [
     "Conventional banking & lending",
     "Conventional insurance",
@@ -59,12 +62,11 @@ master_list = [
     "Rental from non-compliant activities",
     "Others (as determined by SAC)"
 ]
-
 selected_items = st.multiselect("Select applicable activities", options=master_list, default=[])
 
 item_amounts = {}
 if selected_items:
-    st.markdown("### Insert amounts (RM) for selected activities")
+    st.markdown("#### Insert amounts (RM) for selected activities")
     for item in selected_items:
         item_amounts[item] = st.number_input(
             f"Amount (RM) — {item}",
@@ -77,30 +79,24 @@ total_non_perm = sum(item_amounts.values()) if item_amounts else 0.0
 
 st.divider()
 
-# -------------------------
-# TIER 1 OUTPUT (PBT ONLY)
-# -------------------------
-st.markdown("## Tier 1 Output (PBT-based only)")
-c1, c2, c3 = st.columns(3)
+# Tier 1 output (PBT only) + PASS/FAIL gate
+st.markdown("### Tier 1 Output (PBT-based only)")
 
-with c1:
+o1, o2, o3 = st.columns(3)
+with o1:
     st.metric("Total Non-permissible (RM)", f"{total_non_perm:,.2f}")
-
-with c2:
+with o2:
     st.metric("Benchmark", f"{tier1_benchmark:.1f}%")
-
-with c3:
-    # Contribution vs PBT ONLY
+with o3:
     if group_pbt <= 0:
         contribution_pbt = None
         tier1_status = "FAIL"
         st.metric("Contribution vs PBT (%)", "—")
     else:
-        contribution_pbt = (total_non_perm / group_pbt) * 100
+        contribution_pbt = safe_percent(total_non_perm, group_pbt)
         st.metric("Contribution vs PBT (%)", f"{contribution_pbt:.3f}%")
         tier1_status = "PASS" if contribution_pbt <= tier1_benchmark else "FAIL"
 
-# PASS/FAIL label (only Tier 1)
 if group_pbt <= 0:
     st.error("Tier 1 Status: FAIL — PBT must be positive to evaluate Tier 1. Tier 2 is locked.")
 elif tier1_status == "PASS":
@@ -110,9 +106,9 @@ else:
 
 st.caption("Note: Group Total Income is retained as Tier 1 input reference, but Tier 1 decision is based on PBT only.")
 
-# -------------------------
-# TIER 2 (SHOW ONLY IF PASS)
-# -------------------------
+# =========================
+# TIER 2 (ONLY IF TIER 1 PASS)
+# =========================
 if tier1_status == "PASS":
     st.divider()
     st.subheader("Tier 2 — Measuring riba-based elements through financial ratios (<33%)")
@@ -133,30 +129,38 @@ if tier1_status == "PASS":
             min_value=0.0, value=0.0, step=1000.0, format="%.2f"
         )
 
-    def safe_percent(n, d):
-        if d is None or d == 0:
-            return None
-        return (n / d) * 100
-
     cash_ratio = safe_percent(cash_conventional, total_assets)
     debt_ratio = safe_percent(interest_bearing_debt, total_assets)
 
     with colB:
-        st.markdown("### Tier 2 Output (Soft labels)")
+        st.markdown("### Tier 2 Output")
         st.metric("Tier 2 Threshold", f"{tier2_threshold:.1f}%")
 
+        # Show ratios + soft labels
         if cash_ratio is None:
             st.metric("Cash / Total Assets (%)", "—")
             st.warning("Cannot compute Cash Ratio (Total Assets = 0).")
         else:
             st.metric("Cash / Total Assets (%)", f"{cash_ratio:.3f}%")
-            st.write("**Label:**", "Within 33% threshold" if cash_ratio <= tier2_threshold else "Exceeds 33% threshold")
+            st.write("**Label (Cash):**", "Within 33% threshold" if cash_ratio <= tier2_threshold else "Exceeds 33% threshold")
 
         if debt_ratio is None:
             st.metric("Debt / Total Assets (%)", "—")
             st.warning("Cannot compute Debt Ratio (Total Assets = 0).")
         else:
             st.metric("Debt / Total Assets (%)", f"{debt_ratio:.3f}%")
-            st.write("**Label:**", "Within 33% threshold" if debt_ratio <= tier2_threshold else "Exceeds 33% threshold")
+            st.write("**Label (Debt):**", "Within 33% threshold" if debt_ratio <= tier2_threshold else "Exceeds 33% threshold")
 
-        st.caption("Tier 2 labels are indicative measures of riba-based exposure (rule-based).")
+        st.divider()
+
+        # Tier 2 PASS/FAIL only if BOTH ratios are <= threshold
+        if cash_ratio is None or debt_ratio is None:
+            st.warning("Tier 2 Status: NOT READY — Please ensure Total Assets > 0 and complete inputs.")
+        else:
+            tier2_status = "PASS" if (cash_ratio <= tier2_threshold and debt_ratio <= tier2_threshold) else "FAIL"
+            if tier2_status == "PASS":
+                st.success("Tier 2 Status: PASS — Both Cash Ratio and Debt Ratio are within 33% threshold.")
+            else:
+                st.error("Tier 2 Status: FAIL — One or both ratios exceed the 33% threshold.")
+
+        st.caption("Tier 2 decision is based on BOTH ratios meeting the <33% threshold (rule-based).")
