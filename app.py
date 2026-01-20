@@ -3,54 +3,35 @@ import streamlit as st
 st.set_page_config(page_title="2-Tier Shariah Screening Prototype", layout="wide")
 
 st.title("2-Tier Quantitative Screening Prototype (Rule-Based)")
-st.caption("Tier 1: Non-permissible contribution (benchmark 5%).  Tier 2: Riba ratios (threshold 33%). Soft labels only.")
-
-# -------------------------
-# Helpers
-# -------------------------
-def safe_percent(numerator: float, denominator: float):
-    if denominator is None or denominator == 0:
-        return None
-    return (numerator / denominator) * 100
-
-def soft_label(value, threshold, below_text, above_text):
-    if value is None:
-        return "Not computed (invalid denominator)"
-    return below_text if value <= threshold else above_text
-
-def rm(x):
-    try:
-        return float(x)
-    except:
-        return 0.0
+st.caption("Tier 1: Contribution vs PBT (≤ 5%) → PASS/FAIL gate. Tier 2 appears ONLY if Tier 1 = PASS.")
 
 # -------------------------
 # Sidebar settings
 # -------------------------
-st.sidebar.header("Prototype Settings")
-tier1_benchmark = st.sidebar.number_input("Tier 1 benchmark (%)", min_value=0.0, max_value=100.0, value=5.0, step=0.1)
-tier2_threshold = st.sidebar.number_input("Tier 2 threshold (%)", min_value=0.0, max_value=100.0, value=33.0, step=0.1)
-
-st.sidebar.divider()
-st.sidebar.markdown("**Soft label mode:** No PASS/FAIL. Only threshold comparisons.")
+st.sidebar.header("Settings")
+tier1_benchmark = st.sidebar.number_input(
+    "Tier 1 benchmark (%)",
+    min_value=0.0, max_value=100.0,
+    value=5.0, step=0.1
+)
+tier2_threshold = st.sidebar.number_input(
+    "Tier 2 threshold (%)",
+    min_value=0.0, max_value=100.0,
+    value=33.0, step=0.1
+)
 
 # -------------------------
-# Layout
+# Tier 1 Inputs
 # -------------------------
-col1, col2 = st.columns([1, 1], gap="large")
+st.subheader("Tier 1 — Non-permissible contribution (Based on Group Profit Before Tax)")
 
-# =========================================================
-# TIER 1
-# =========================================================
-with col1:
-    st.subheader("Tier 1 — Non-permissible activities contribution (Benchmark reference)")
-    st.markdown("User enters figures based on audited financial statements.")
+t1_left, t1_right = st.columns([1, 1], gap="large")
 
-    t1_a, t1_b = st.columns(2)
-    with t1_a:
-        group_total_income = st.number_input("Group Total Income (RM)", min_value=0.0, value=0.0, step=1000.0, format="%.2f")
-    with t1_b:
-        group_pbt = st.number_input("Group Profit Before Tax (PBT) (RM)", value=0.0, step=1000.0, format="%.2f")
+with t1_left:
+    group_pbt = st.number_input(
+        "Group Profit Before Tax (PBT) (RM)",
+        value=0.0, step=1000.0, format="%.2f"
+    )
 
     st.markdown("### Select non-permissible items (multi-select) and enter amounts")
     master_list = [
@@ -73,92 +54,97 @@ with col1:
 
     selected_items = st.multiselect("Non-permissible activities", options=master_list, default=[])
 
-    # amounts for selected items
     item_amounts = {}
     if selected_items:
         for item in selected_items:
-            item_amounts[item] = st.number_input(f"Amount (RM) — {item}", min_value=0.0, value=0.0, step=100.0, format="%.2f")
+            item_amounts[item] = st.number_input(
+                f"Amount (RM) — {item}",
+                min_value=0.0, value=0.0, step=100.0, format="%.2f"
+            )
     else:
-        st.info("Select one or more activities to enter amounts, or leave empty.")
+        st.info("Select one or more activities to enter amounts.")
 
     total_non_perm = sum(item_amounts.values()) if item_amounts else 0.0
 
+with t1_right:
+    st.markdown("### Tier 1 Calculation Output")
+
+    st.metric("Total Non-permissible (RM)", f"{total_non_perm:,.2f}")
+    st.metric("Tier 1 Benchmark", f"{tier1_benchmark:.1f}%")
+
+    # Contribution vs PBT ONLY
+    if group_pbt <= 0:
+        contribution_pbt = None
+        tier1_status = "FAIL"
+        st.error("PBT is ≤ 0, so Tier 1 cannot be evaluated. Please enter a valid (positive) PBT.")
+        st.metric("Contribution vs PBT (%)", "—")
+    else:
+        contribution_pbt = (total_non_perm / group_pbt) * 100
+        st.metric("Contribution vs PBT (%)", f"{contribution_pbt:.3f}%")
+
+        if contribution_pbt <= tier1_benchmark:
+            tier1_status = "PASS"
+            st.success("Tier 1 Status: PASS (You may proceed to Tier 2)")
+        else:
+            tier1_status = "FAIL"
+            st.error("Tier 1 Status: FAIL (Tier 2 is not available)")
+
+    st.caption("Tier 2 will only appear when Tier 1 = PASS.")
+
+# -------------------------
+# Tier 2 (ONLY if Tier 1 PASS)
+# -------------------------
+if tier1_status == "PASS":
     st.divider()
-    st.markdown("### Tier 1 Computation (soft labels)")
-    c_income = safe_percent(total_non_perm, group_total_income)
-    # For PBT: if <= 0, not applicable
-    c_pbt = None if group_pbt <= 0 else safe_percent(total_non_perm, group_pbt)
-
-    label_income = soft_label(
-        c_income, tier1_benchmark,
-        f"Below {tier1_benchmark:.1f}% benchmark",
-        f"Above {tier1_benchmark:.1f}% benchmark"
-    )
-
-    label_pbt = "Not applicable (PBT ≤ 0)" if group_pbt <= 0 else soft_label(
-        c_pbt, tier1_benchmark,
-        f"Below {tier1_benchmark:.1f}% benchmark",
-        f"Above {tier1_benchmark:.1f}% benchmark"
-    )
-
-    k1, k2, k3 = st.columns(3)
-    k1.metric("Total Non-permissible (RM)", f"{total_non_perm:,.2f}")
-    k2.metric("Contribution vs Income (%)", "-" if c_income is None else f"{c_income:.3f}%")
-    k3.metric("Tier 1 Benchmark", f"{tier1_benchmark:.1f}%")
-
-    st.write("**Label (vs Income):**", label_income)
-    st.write("**Contribution vs PBT (%):**", "—" if c_pbt is None else f"{c_pbt:.3f}%")
-    st.write("**Label (vs PBT):**", label_pbt)
-
-    st.caption("Note: Tier 1 labels are indicative only and do not constitute a Shariah compliance decision.")
-
-# =========================================================
-# TIER 2
-# =========================================================
-with col2:
     st.subheader("Tier 2 — Riba-based ratios (Threshold reference)")
-    st.markdown("Measures exposure using cash/debt ratios relative to total assets.")
 
-    t2_a, t2_b = st.columns(2)
-    with t2_a:
-        cash_conventional = st.number_input("Cash in conventional accounts (RM)", min_value=0.0, value=0.0, step=1000.0, format="%.2f")
-    with t2_b:
-        interest_bearing_debt = st.number_input("Interest-bearing debt (RM)", min_value=0.0, value=0.0, step=1000.0, format="%.2f")
+    colA, colB = st.columns([1, 1], gap="large")
 
-    total_assets = st.number_input("Total Assets (RM)", min_value=0.0, value=0.0, step=1000.0, format="%.2f")
+    with colA:
+        cash_conventional = st.number_input(
+            "Cash in conventional accounts (RM)",
+            min_value=0.0, value=0.0, step=1000.0, format="%.2f"
+        )
+        interest_bearing_debt = st.number_input(
+            "Interest-bearing debt (RM)",
+            min_value=0.0, value=0.0, step=1000.0, format="%.2f"
+        )
+        total_assets = st.number_input(
+            "Total Assets (RM)",
+            min_value=0.0, value=0.0, step=1000.0, format="%.2f"
+        )
 
-    st.divider()
-    st.markdown("### Tier 2 Computation (soft labels)")
-    cash_ratio = safe_percent(cash_conventional, total_assets)
-    debt_ratio = safe_percent(interest_bearing_debt, total_assets)
+    with colB:
+        st.markdown("### Tier 2 Output")
 
-    label_cash = soft_label(
-        cash_ratio, tier2_threshold,
-        f"Within {tier2_threshold:.1f}% threshold",
-        f"Exceeds {tier2_threshold:.1f}% threshold"
-    )
-    label_debt = soft_label(
-        debt_ratio, tier2_threshold,
-        f"Within {tier2_threshold:.1f}% threshold",
-        f"Exceeds {tier2_threshold:.1f}% threshold"
-    )
+        def safe_percent(n, d):
+            if d is None or d == 0:
+                return None
+            return (n / d) * 100
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Cash Ratio (%)", "-" if cash_ratio is None else f"{cash_ratio:.3f}%")
-    m2.metric("Debt Ratio (%)", "-" if debt_ratio is None else f"{debt_ratio:.3f}%")
-    m3.metric("Tier 2 Threshold", f"{tier2_threshold:.1f}%")
+        cash_ratio = safe_percent(cash_conventional, total_assets)
+        debt_ratio = safe_percent(interest_bearing_debt, total_assets)
 
-    st.write("**Label (Cash Ratio):**", label_cash)
-    st.write("**Label (Debt Ratio):**", label_debt)
+        st.metric("Tier 2 Threshold", f"{tier2_threshold:.1f}%")
 
-    st.caption("Note: Tier 2 labels are indicative measures of riba-related exposure and are not final compliance decisions.")
+        if cash_ratio is None:
+            st.metric("Cash / Total Assets (%)", "—")
+            st.warning("Cannot compute Cash Ratio (Total Assets = 0).")
+        else:
+            st.metric("Cash / Total Assets (%)", f"{cash_ratio:.3f}%")
+            st.write(
+                "**Label:**",
+                "Within threshold" if cash_ratio <= tier2_threshold else "Exceeds threshold"
+            )
 
-st.divider()
-st.subheader("Tester Notes")
-st.markdown(
-    """
-- This is a **rule-based prototype** (no AI).  
-- Users input figures based on financial reports; the system computes **Tier 1 (5%)** and **Tier 2 (33%)** outputs with **soft labels**.
-- You can change benchmark/threshold in the sidebar.
-"""
-)
+        if debt_ratio is None:
+            st.metric("Debt / Total Assets (%)", "—")
+            st.warning("Cannot compute Debt Ratio (Total Assets = 0).")
+        else:
+            st.metric("Debt / Total Assets (%)", f"{debt_ratio:.3f}%")
+            st.write(
+                "**Label:**",
+                "Within threshold" if debt_ratio <= tier2_threshold else "Exceeds threshold"
+            )
+
+        st.caption("Tier 2 labels are indicative measures of riba-related exposure (rule-based).")
