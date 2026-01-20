@@ -21,17 +21,19 @@ def safe_percent(n, d):
         return None
     return (n / d) * 100
 
+def ratio_label(value, threshold):
+    if value is None:
+        return "Not computed (invalid denominator)"
+    return "Within 33% threshold" if value <= threshold else "Exceeds 33% threshold"
+
 # =========================
 # TIER 1
 # =========================
 st.subheader("Non-permissible activities contribution (Benchmark reference)")
 st.write("User enters figures based on audited financial statements.")
 
-# -------------------------------------------------
-# STEP 1: LIST OF NON-PERMISSIBLE ACTIVITIES (TOP)
-# -------------------------------------------------
+# STEP 1: Activities (top)
 st.markdown("#### List of Non-Permissible Activities (Multi-select)")
-
 master_list = [
     "Conventional banking & lending",
     "Conventional insurance",
@@ -49,7 +51,6 @@ master_list = [
     "Rental from non-compliant activities",
     "Others (as determined by SAC)"
 ]
-
 selected_items = st.multiselect("Select applicable activities", options=master_list, default=[])
 
 item_amounts = {}
@@ -67,11 +68,8 @@ total_non_perm = sum(item_amounts.values()) if item_amounts else 0.0
 
 st.divider()
 
-# -------------------------------------------------
-# STEP 2: GROUP FINANCIAL INPUTS (MOVED BELOW)
-# -------------------------------------------------
+# STEP 2: Group financial inputs (below)
 st.markdown("#### Group Financial Information")
-
 c1, c2 = st.columns(2, gap="large")
 with c1:
     group_total_income = st.number_input(
@@ -86,11 +84,8 @@ with c2:
 
 st.divider()
 
-# -------------------------------------------------
-# STEP 3: TIER 1 OUTPUT (PBT ONLY)
-# -------------------------------------------------
+# STEP 3: Tier 1 output (PBT only)
 st.markdown("### Tier 1 Output (PBT-based only)")
-
 o1, o2, o3 = st.columns(3)
 with o1:
     st.metric("Total Non-permissible (RM)", f"{total_non_perm:,.2f}")
@@ -145,20 +140,33 @@ if tier1_status == "PASS":
         st.markdown("### Tier 2 Output")
         st.metric("Tier 2 Threshold", f"{tier2_threshold:.1f}%")
 
-        if cash_ratio is not None:
-            st.metric("Cash / Total Assets (%)", f"{cash_ratio:.3f}%")
-        else:
+        # Ratio 1 + label
+        if cash_ratio is None:
             st.metric("Cash / Total Assets (%)", "—")
-
-        if debt_ratio is not None:
-            st.metric("Debt / Total Assets (%)", f"{debt_ratio:.3f}%")
+            st.warning("Cash ratio cannot be computed (Total Assets = 0).")
+            cash_lbl = "Not computed"
         else:
+            st.metric("Cash / Total Assets (%)", f"{cash_ratio:.3f}%")
+            cash_lbl = ratio_label(cash_ratio, tier2_threshold)
+            st.write("**Label (Cash):**", cash_lbl)
+
+        st.write("")  # spacing
+
+        # Ratio 2 + label
+        if debt_ratio is None:
             st.metric("Debt / Total Assets (%)", "—")
+            st.warning("Debt ratio cannot be computed (Total Assets = 0).")
+            debt_lbl = "Not computed"
+        else:
+            st.metric("Debt / Total Assets (%)", f"{debt_ratio:.3f}%")
+            debt_lbl = ratio_label(debt_ratio, tier2_threshold)
+            st.write("**Label (Debt):**", debt_lbl)
 
         st.divider()
 
+        # Final Tier 2 PASS/FAIL (BOTH must be within threshold)
         if cash_ratio is None or debt_ratio is None:
-            st.warning("Tier 2 Status: NOT READY — Complete all inputs.")
+            st.warning("Tier 2 Status: NOT READY — Please ensure Total Assets > 0 and complete inputs.")
         else:
             tier2_status = "PASS" if (cash_ratio <= tier2_threshold and debt_ratio <= tier2_threshold) else "FAIL"
             if tier2_status == "PASS":
@@ -166,4 +174,4 @@ if tier1_status == "PASS":
             else:
                 st.error("Tier 2 Status: FAIL — One or both ratios exceed the 33% threshold.")
 
-        st.caption("Tier 2 decision is based on BOTH ratios meeting the <33% threshold (rule-based).")
+        st.caption("Tier 2 shows per-ratio threshold labels first, then determines overall PASS/FAIL (rule-based).")
