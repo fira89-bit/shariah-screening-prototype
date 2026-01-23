@@ -21,13 +21,20 @@ def safe_percent(n, d):
         return None
     return (n / d) * 100
 
+def within_exceeds(value, threshold):
+    if value is None:
+        return "Not computed"
+    return "Within threshold" if value <= threshold else "Exceeds threshold"
+
 # =========================
 # TIER 1
 # =========================
 st.subheader("Business Activity Benchmark (Benchmark reference)")
 st.write("User enters figures based on audited financial statements.")
 
-# STEP 1: Activities (top)
+# -------------------------------------------------
+# STEP 1: Shariah non-compliant business activities (KEEP)
+# -------------------------------------------------
 st.markdown("#### Shariah non-compliant business activities")
 st.write("Multiple select Shariah non-compliant business activity and enter amount.")
 
@@ -48,6 +55,7 @@ master_list = [
     "Rental from non-compliant activities",
     "Others (as determined by SAC)"
 ]
+
 selected_items = st.multiselect("Select applicable activities", options=master_list, default=[])
 
 item_amounts = {}
@@ -56,7 +64,8 @@ if selected_items:
     for item in selected_items:
         item_amounts[item] = st.number_input(
             f"Amount (RM) — {item}",
-            min_value=0.0, value=0.0, step=100.0, format="%.2f"
+            min_value=0.0, value=0.0, step=100.0, format="%.2f",
+            key=f"amt_{item}"
         )
 else:
     st.info("Select one or more activities to enter amounts.")
@@ -65,15 +74,35 @@ total_non_perm = sum(item_amounts.values()) if item_amounts else 0.0
 
 st.divider()
 
-# STEP 2: Group financial inputs (below)
+# -------------------------------------------------
+# STEP 2: Group Financial Information — NBA Income formula (NEW)
+# -------------------------------------------------
 st.markdown("#### Group Financial Information")
-c1, c2 = st.columns(2, gap="large")
-with c1:
-    group_total_income = st.number_input(
-        "Group Total Income (RM)",
+st.write("Income (NBA) = Revenue + Other Income + Share of Profit")
+
+i1, i2, i3 = st.columns(3, gap="large")
+with i1:
+    revenue = st.number_input(
+        "Revenue (RM)",
         min_value=0.0, value=0.0, step=1000.0, format="%.2f"
     )
-with c2:
+with i2:
+    other_income = st.number_input(
+        "Other Income (RM)",
+        min_value=0.0, value=0.0, step=1000.0, format="%.2f"
+    )
+with i3:
+    share_of_profit = st.number_input(
+        "Share of Profit (RM)",
+        min_value=0.0, value=0.0, step=1000.0, format="%.2f"
+    )
+
+group_total_income_nba = revenue + other_income + share_of_profit
+
+p1, p2 = st.columns(2, gap="large")
+with p1:
+    st.metric("Group Total Income (NBA) (RM)", f"{group_total_income_nba:,.2f}")
+with p2:
     group_pbt = st.number_input(
         "Group Profit Before Tax (PBT) (RM)",
         value=0.0, step=1000.0, format="%.2f"
@@ -81,12 +110,14 @@ with c2:
 
 st.divider()
 
-# STEP 3: Tier 1 computation (PBT only)
+# -------------------------------------------------
+# STEP 3: Computation Business Activity Benchmark (PBT-based only)
+# -------------------------------------------------
 st.markdown("### Computation Business Activity Benchmark")
 
 o1, o2, o3 = st.columns(3)
 with o1:
-    st.metric("Total Non-permissible (RM)", f"{total_non_perm:,.2f}")
+    st.metric("Total non-compliant amount (RM)", f"{total_non_perm:,.2f}")
 with o2:
     st.metric("Benchmark", f"{tier1_benchmark:.1f}%")
 with o3:
@@ -106,7 +137,7 @@ elif tier1_status == "PASS":
 else:
     st.error("Tier 1 Status: FAIL — Tier 2 is locked.")
 
-st.caption("Note: Group Total Income is retained as Tier 1 reference input, but Tier 1 decision is based on PBT only.")
+st.caption("Note: Group Total Income (NBA) is computed from Revenue + Other Income + Share of Profit.")
 
 # =========================
 # TIER 2 (ONLY IF TIER 1 PASS)
@@ -139,21 +170,27 @@ if tier1_status == "PASS":
         st.markdown("### Computation Financial Ratio Benchmark")
         st.metric("Threshold", f"{tier2_threshold:.1f}%")
 
-        # Cash Ratio
+        # Cash Ratio + status (no "Label" word)
         if cash_ratio is None:
             st.metric("Cash Ratio (%)", "—")
             st.warning("Cash ratio cannot be computed (Total Assets = 0).")
+            cash_status = "Not computed"
         else:
             st.metric("Cash Ratio (%)", f"{cash_ratio:.3f}%")
+            cash_status = within_exceeds(cash_ratio, tier2_threshold)
+        st.write("Cash Ratio Status:", cash_status)
 
         st.write("")
 
-        # Debt Ratio
+        # Debt Ratio + status (no "Label" word)
         if debt_ratio is None:
             st.metric("Debt Ratio (%)", "—")
             st.warning("Debt ratio cannot be computed (Total Assets = 0).")
+            debt_status = "Not computed"
         else:
             st.metric("Debt Ratio (%)", f"{debt_ratio:.3f}%")
+            debt_status = within_exceeds(debt_ratio, tier2_threshold)
+        st.write("Debt Ratio Status:", debt_status)
 
         st.divider()
 
