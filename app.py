@@ -132,11 +132,11 @@ with r2:
     if total_income_nba <= 0:
         contribution_income = None
         tier1_status = "FAIL"
-        st.metric("Contribution vs Total Income (NBA) (%)", "—")
+        st.metric("Contribution vs Total Income (%)", "—")
     else:
         contribution_income = safe_percent(total_non_compliant, total_income_nba)
         st.metric(
-            "Contribution vs Total Income (NBA) (%)",
+            "Contribution vs Total Income (%)",
             f"{contribution_income:.3f}%"
         )
         tier1_status = "PASS" if contribution_income <= TIER1_BENCHMARK else "FAIL"
@@ -155,7 +155,7 @@ else:
     st.error("Tier 1 Status: FAIL — Tier 2 is locked.")
 
 st.caption(
-    "Note: Total Income (NBA) is computed from Revenue + Other Income + Share of Profit."
+    "Note: Total Income is computed from Revenue + Other Income + Share of Profit."
 )
 
 # =========================
