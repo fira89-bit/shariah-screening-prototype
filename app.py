@@ -21,7 +21,7 @@ def within_exceeds(value, threshold):
 # =========================
 # APP HEADER
 # =========================
-st.title("Business Activity Benchmark")
+st.title("SHARIAH-COMPLIANT SECURITIES SCREENING")
 st.caption(
     "Two-stage quantitative screening using Business Activity Benchmark (5%) "
     "and Financial Ratio Benchmark (33%)."
@@ -30,7 +30,7 @@ st.caption(
 # =========================
 # TIER 1 — BUSINESS ACTIVITY BENCHMARK
 # =========================
-st.subheader("Business Activity Benchmark (Benchmark reference)")
+st.subheader("Business Activity Benchmark")
 st.write("User enters figures based on audited financial statements.")
 
 # -------------------------------------------------
@@ -119,16 +119,16 @@ st.metric("Total Income (RM)", f"{total_income_nba:,.2f}")
 st.divider()
 
 # -------------------------------------------------
-# STEP 3: Tier 1 Computation
+# STEP 3: Tier 1 Computation (UPDATED LAYOUT)
 # -------------------------------------------------
 st.markdown("### Computation Business Activity Benchmark")
 
 r1, r2, r3 = st.columns(3)
+
 with r1:
     st.metric("Total non-compliant amount (RM)", f"{total_non_compliant:,.2f}")
+
 with r2:
-    st.metric("Benchmark", f"{TIER1_BENCHMARK:.1f}%")
-with r3:
     if total_income_nba <= 0:
         contribution_income = None
         tier1_status = "FAIL"
@@ -140,6 +140,9 @@ with r3:
             f"{contribution_income:.3f}%"
         )
         tier1_status = "PASS" if contribution_income <= TIER1_BENCHMARK else "FAIL"
+
+with r3:
+    st.metric("Benchmark", f"{TIER1_BENCHMARK:.1f}%")
 
 if total_income_nba <= 0:
     st.error(
