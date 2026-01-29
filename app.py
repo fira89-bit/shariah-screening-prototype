@@ -21,7 +21,7 @@ def within_exceeds(value, threshold):
 # =========================
 # APP HEADER
 # =========================
-st.title("Business Activity Benchmark")
+st.title("SHARIAH-COMPLIANT SECURITIES SCREENING")
 st.caption(
     "Two-stage quantitative screening using Business Activity Benchmark (5%) "
     "and Financial Ratio Benchmark (33%)."
@@ -30,7 +30,7 @@ st.caption(
 # =========================
 # TIER 1 — BUSINESS ACTIVITY BENCHMARK
 # =========================
-st.subheader("Business Activity Benchmark (Benchmark reference)")
+st.subheader("Business Activity Benchmark")
 st.write("User enters figures based on audited financial statements.")
 
 # -------------------------------------------------
@@ -82,7 +82,7 @@ st.divider()
 # STEP 2: Group Financial Information — NBA Income
 # -------------------------------------------------
 st.markdown("#### Group Financial Information")
-st.write("Total Income (NBA) = Revenue + Other Income + Share of Profit / (Loss)")
+st.write("Total Income = Revenue + Other Income + Share of Profit / (Loss)")
 
 c1, c2, c3 = st.columns(3)
 with c1:
@@ -111,7 +111,7 @@ with c3:
     )
 
 total_income_nba = revenue + other_income + share_of_profit
-st.metric("Total Income (NBA) (RM)", f"{total_income_nba:,.2f}")
+st.metric("Total Income (RM)", f"{total_income_nba:,.2f}")
 
 st.divider()
 
@@ -129,11 +129,11 @@ with r2:
     if total_income_nba <= 0:
         contribution_income = None
         tier1_status = "FAIL"
-        st.metric("Contribution vs Total Income (NBA) (%)", "—")
+        st.metric("Contribution vs Total Income (%)", "—")
     else:
         contribution_income = safe_percent(total_non_compliant, total_income_nba)
         st.metric(
-            "Contribution vs Total Income (NBA) (%)",
+            "Contribution vs Total Income (%)",
             f"{contribution_income:.3f}%"
         )
         tier1_status = "PASS" if contribution_income <= TIER1_BENCHMARK else "FAIL"
@@ -143,7 +143,7 @@ with r3:
 
 if total_income_nba <= 0:
     st.error(
-        "Tier 1 Status: FAIL — Total Income (NBA) must be positive. "
+        "Tier 1 Status: FAIL — Total Income must be positive. "
         "Tier 2 is locked."
     )
 elif tier1_status == "PASS":
@@ -152,7 +152,7 @@ else:
     st.error("Tier 1 Status: FAIL — Tier 2 is locked.")
 
 st.caption(
-    "Note: Total Income (NBA) is computed from Revenue + Other Income + Share of Profit / (Loss)."
+    "Note: Total Income is computed from Revenue + Other Income + Share of Profit / (Loss)."
 )
 
 # =========================
