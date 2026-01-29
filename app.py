@@ -21,7 +21,7 @@ def within_exceeds(value, threshold):
 # =========================
 # APP HEADER
 # =========================
-st.title("SHARIAH-COMPLIANT SECURITIES SCREENING")
+st.title("Business Activity Benchmark")
 st.caption(
     "Two-stage quantitative screening using Business Activity Benchmark (5%) "
     "and Financial Ratio Benchmark (33%)."
@@ -30,7 +30,7 @@ st.caption(
 # =========================
 # TIER 1 — BUSINESS ACTIVITY BENCHMARK
 # =========================
-st.subheader("Business Activity Benchmark")
+st.subheader("Business Activity Benchmark (Benchmark reference)")
 st.write("User enters figures based on audited financial statements.")
 
 # -------------------------------------------------
@@ -57,10 +57,7 @@ activities = [
     "Others (as determined by SAC)"
 ]
 
-selected_items = st.multiselect(
-    "Select applicable activities",
-    options=activities
-)
+selected_items = st.multiselect("Select applicable activities", options=activities)
 
 item_amounts = {}
 if selected_items:
@@ -85,7 +82,7 @@ st.divider()
 # STEP 2: Group Financial Information — NBA Income
 # -------------------------------------------------
 st.markdown("#### Group Financial Information")
-st.write("Total Income = Revenue + Other Income + Share of Profit")
+st.write("Total Income (NBA) = Revenue + Other Income + Share of Profit / (Loss)")
 
 c1, c2, c3 = st.columns(3)
 with c1:
@@ -105,21 +102,21 @@ with c2:
         format="%.2f"
     )
 with c3:
+    # ✅ allow negative (loss)
     share_of_profit = st.number_input(
-        "Share of Profit (RM)",
-        min_value=0.0,
+        "Share of Profit / (Loss) (RM)",
         value=0.0,
         step=1000.0,
         format="%.2f"
     )
 
 total_income_nba = revenue + other_income + share_of_profit
-st.metric("Total Income (RM)", f"{total_income_nba:,.2f}")
+st.metric("Total Income (NBA) (RM)", f"{total_income_nba:,.2f}")
 
 st.divider()
 
 # -------------------------------------------------
-# STEP 3: Tier 1 Computation (UPDATED LAYOUT)
+# STEP 3: Tier 1 Computation (Benchmark at right)
 # -------------------------------------------------
 st.markdown("### Computation Business Activity Benchmark")
 
@@ -132,11 +129,11 @@ with r2:
     if total_income_nba <= 0:
         contribution_income = None
         tier1_status = "FAIL"
-        st.metric("Contribution vs Total Income (%)", "—")
+        st.metric("Contribution vs Total Income (NBA) (%)", "—")
     else:
         contribution_income = safe_percent(total_non_compliant, total_income_nba)
         st.metric(
-            "Contribution vs Total Income (%)",
+            "Contribution vs Total Income (NBA) (%)",
             f"{contribution_income:.3f}%"
         )
         tier1_status = "PASS" if contribution_income <= TIER1_BENCHMARK else "FAIL"
@@ -155,7 +152,7 @@ else:
     st.error("Tier 1 Status: FAIL — Tier 2 is locked.")
 
 st.caption(
-    "Note: Total Income is computed from Revenue + Other Income + Share of Profit."
+    "Note: Total Income (NBA) is computed from Revenue + Other Income + Share of Profit / (Loss)."
 )
 
 # =========================
@@ -223,7 +220,7 @@ if tier1_status == "PASS":
 
         st.divider()
 
-        # Overall Tier 2 decision
+        # Overall Tier 2 decision + disclaimer after PASS
         if cash_ratio is None or debt_ratio is None:
             st.warning(
                 "Tier 2 Status: NOT READY — Please ensure Total Assets > 0 "
@@ -238,6 +235,11 @@ if tier1_status == "PASS":
             if tier2_status == "PASS":
                 st.success(
                     "Tier 2 Status: PASS — Both ratios are within the threshold."
+                )
+                st.info(
+                    "Disclaimer: This quantitative screening outcome does not constitute a final Shariah compliance "
+                    "decision. Companies that pass both benchmarks should proceed to a qualitative assessment, "
+                    "which requires review under an appropriate Shariah governance framework."
                 )
             else:
                 st.error(
